@@ -13,7 +13,7 @@ import pandas as pd
 from .config import EFFECTIVENESS_SCENARIOS, MONTE_CARLO_RUNS, RANDOM_SEED, REVIEW_CAPACITIES
 
 
-def rank_top_k(scores: np.ndarray, k: int, seed: int = RANDOM_SEED) -> np.ndarray:
+def rank_top_k(scores: np.ndarray, k: int) -> np.ndarray:
     k = min(k, len(scores))
     return np.argsort(-scores, kind="stable")[:k]
 

@@ -24,7 +24,7 @@ denominator is documented. SQL cross-checks run in DuckDB."
 ## 3. Diagnostics (60s)
 
 "On the demo fixture (600 synthetic orders, 346 eligible): late rate ~54%,
-mean lead time ~14 days, split into ~5 days approval-to-carrier and ~10 days
+mean lead time ~15.6 days, split into ~4.9 days approval-to-carrier and ~9.7 days
 carrier-to-delivered. Pareto shows concentration across sellers; MG/SP states
 and short promised windows show higher late rates — but I report these as
 potential contributing factors requiring operational validation, never proven

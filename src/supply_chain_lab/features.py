@@ -163,6 +163,22 @@ def _seller_region_lookup(order_items: pd.DataFrame, sellers: pd.DataFrame | Non
     return tmp.loc[idx, ["order_id", "seller_state"]].reset_index(drop=True)
 
 
+NUMERIC_FEATURES = [
+    "promised_days_at_approval",
+    "n_items",
+    "n_sellers",
+    "is_multi_seller",
+    "log_order_value",
+    "log_freight_value",
+    "freight_share",
+    "approval_dow",
+    "approval_month",
+    "approval_hour",
+    "is_weekend_approval",
+]
+CATEGORICAL_FEATURES = ["primary_category", "customer_state", "seller_state"]
+
+
 def build_model_frame(
     orders: pd.DataFrame,
     order_items: pd.DataFrame,
@@ -210,11 +226,20 @@ def build_model_frame(
     df["promised_days_at_approval"] = (
         pd.to_datetime(df["order_estimated_delivery_date"]) - approved
     ).dt.total_seconds() / 86400
-    df["log_order_value"] = np.log1p(df["order_value"].fillna(0))
-    df["log_freight_value"] = np.log1p(df["freight_value"].fillna(0))
-    df["freight_share"] = df["freight_value"] / (df["order_value"] + df["freight_value"] + 1e-9)
-    df["n_items"] = df["n_items"].fillna(0)
-    df["n_sellers"] = df["n_sellers"].fillna(0)
+    df["log_order_value"] = np.log1p(pd.to_numeric(df["order_value"], errors="coerce").fillna(0))
+    df["log_freight_value"] = np.log1p(
+        pd.to_numeric(df["freight_value"], errors="coerce").fillna(0)
+    )
+    df["freight_share"] = (
+        pd.to_numeric(df["freight_value"], errors="coerce")
+        / (
+            pd.to_numeric(df["order_value"], errors="coerce")
+            + pd.to_numeric(df["freight_value"], errors="coerce")
+            + 1e-9
+        )
+    ).fillna(0)
+    df["n_items"] = pd.to_numeric(df["n_items"], errors="coerce").fillna(0)
+    df["n_sellers"] = pd.to_numeric(df["n_sellers"], errors="coerce").fillna(0)
     df["is_multi_seller"] = (df["n_sellers"] > 1).astype(int)
     df["customer_state"] = df.get("customer_state", pd.Series("unknown", index=df.index)).fillna(
         "unknown"
@@ -242,19 +267,3 @@ def build_model_frame(
     if leak:
         raise ValueError(f"Leakage columns present in model frame: {sorted(leak)}")
     return df.reset_index(drop=True)
-
-
-NUMERIC_FEATURES = [
-    "promised_days_at_approval",
-    "n_items",
-    "n_sellers",
-    "is_multi_seller",
-    "log_order_value",
-    "log_freight_value",
-    "freight_share",
-    "approval_dow",
-    "approval_month",
-    "approval_hour",
-    "is_weekend_approval",
-]
-CATEGORICAL_FEATURES = ["primary_category", "customer_state", "seller_state"]

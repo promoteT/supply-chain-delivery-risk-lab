@@ -1,5 +1,11 @@
 # Supply Chain Delivery Risk & Operational Improvement Lab
 
+![CI](https://github.com/promoteT/supply-chain-delivery-risk-lab/actions/workflows/ci.yml/badge.svg)
+![Python](https://img.shields.io/badge/python-3.11%2B-blue)
+![Tests](https://img.shields.io/badge/tests-27%20passed-brightgreen)
+![Ruff](https://img.shields.io/badge/ruff-clean-brightgreen)
+![Mode](https://img.shields.io/badge/mode-demo%20synthetic-orange)
+
 **Headline:** a reproducible analytics lab that turns messy e-commerce order data
 into prioritized delivery-risk decisions — built for a Supply Chain Analyst role.
 
@@ -25,6 +31,21 @@ methods and no inflated claims.
 
 ## Method & workflow
 
+```mermaid
+flowchart LR
+    RAW[data/raw Olist CSVs] --> ING[ingestion]
+    FIX[data/fixtures synthetic] --> ING
+    ING --> VAL[validation + audit]
+    VAL --> ORD[order-level build]
+    ORD --> KPI[KPIs + diagnostics + charts]
+    ORD --> MOD[approval-time model]
+    MOD --> SIM[capacity simulation]
+    KPI --> XL[Excel 9 sheets]
+    MOD --> XL
+    SIM --> XL
+    XL --> DECK[5-slide deck]
+```
+
 ```
 data/raw (Olist CSVs, gitignored) ─┐
 data/fixtures (synthetic, demo) ───┤─► ingestion → validation → order-level build
@@ -45,16 +66,37 @@ data/fixtures (synthetic, demo) ───┤─► ingestion → validation → 
 
 ## Findings (demo fixture — illustrative, n=600 orders / 346 eligible / 68 test)
 
-- Late rate ~54%; mean lead time ~14d (≈5d approval→carrier + ≈10d carrier→delivery).
+| KPI (eligible) | Value |
+|---|---|
+| Late rate | 54.05% (187/346) |
+| On-time rate | 45.95% |
+| Mean lead time | 15.6d (median 14.0d) |
+| Approval → carrier | 4.87d |
+| Carrier → delivered | 9.72d |
+| Mean delay (late only) | 4.02d, max 14.0d |
+
+| Model (test n=68) | ROC-AUC | PR-AUC | Recall@20 |
+|---|---|---|---|
+| Logistic | **0.63** | 0.66 | 0.30 |
+| HistGradientBoosting | 0.59 | 0.60 | — |
+| Business rule | 0.59 | 0.61 | 0.27 |
+| Majority baseline | — | — | — |
+
 - MG/SP and short-promised-window segments run hotter; delays concentrate across
   sellers (Pareto) — potential contributing factors, not proven causes.
-- Approval-time model: logistic ROC-AUC **0.63**, HGB 0.59, business rule 0.59.
-  At 20 reviews/day, model ranking catches ~35% of test lates vs ~30% random.
+- At 20 reviews/day, model ranking catches ~30% of test lates vs ~27% rule.
 - Base-case simulation (50 reviews/day, 25% assumed fix rate): ~7.6 hypothetical
   rescues/day (P5–P95 4–12). **Not observed savings.**
 
-![Lead-time distribution (DEMO synthetic data)](docs/img/lead_time_dist.png)
-![Seller Pareto (DEMO synthetic data)](docs/img/pareto_sellers.png)
+### Charts (DEMO synthetic data)
+
+| Lead time | Delay severity |
+|---|---|
+| ![Lead-time distribution](docs/img/lead_time_dist.png) | ![Delay severity](docs/img/delay_severity.png) |
+
+| Late rate by state | Seller Pareto |
+|---|---|
+| ![Late by state](docs/img/late_by_state.png) | ![Seller Pareto](docs/img/pareto_sellers.png) |
 
 ## Limitations
 
@@ -66,14 +108,28 @@ from late rates; demo sample small. Full cautions: `reports/limitations.md`.
 
 ```bash
 pip install -e ".[dev]"                              # install
-pytest -q                                            # 21 tests
+pytest -q                                            # 27 tests
 python -m supply_chain_lab.pipeline --mode demo      # demo end-to-end
 python -m supply_chain_lab.pipeline --mode real      # real data (needs data/raw CSVs)
 python -m ruff check src tests && python -m ruff format --check src tests
 ```
 
-Outputs: `outputs/delivery_risk_report_demo.xlsx`, `outputs/charts/`,
-`outputs/*.json|*.csv`, `reports/consulting_deck_demo.pptx`.
+Outputs: `outputs/delivery_risk_report_demo.xlsx` (9 sheets), `outputs/charts/` (4 PNGs),
+`outputs/*.json|*.csv`, `reports/consulting_deck_demo.pptx` (5 slides).
+
+### Excel workbook (9 sheets)
+
+| Sheet | Contents |
+|---|---|
+| Executive Dashboard | KPIs + definitions, DEMO-labeled |
+| Operational KPIs | Full KPI table |
+| Seller Analysis | Pareto top-100 + rates |
+| Regional Analysis | Late rate by state + native chart |
+| Delivery Delays | Severity + category patterns |
+| Risk Prioritization | Model vs baselines (TEST) |
+| Scenario Analysis | HYPOTHETICAL costs, yellow editable inputs |
+| Assumptions | Intervention assumptions + limits |
+| Data Dictionary | KPI definitions + denominators |
 
 ## Repository map
 
@@ -81,7 +137,7 @@ Outputs: `outputs/delivery_risk_report_demo.xlsx`, `outputs/charts/`,
 |---|---|
 | `src/supply_chain_lab/` | config, ingestion, validation, features, diagnostics, modelling, simulation, excel_reporting, pipeline, make_fixtures |
 | `sql/` | data_quality, operational_kpis, seller_diagnostics (DuckDB) |
-| `tests/` | 21 tests incl. end-to-end demo + Excel sheet checks |
+| `tests/` | 27 tests incl. end-to-end demo + Excel values/chart/inputs checks |
 | `reports/` | executive_summary, methodology, limitations, demo deck |
 | `docs/` | BUSINESS_CASE, DATA_DICTIONARY, INTERVIEW_GUIDE, BUILD_LOG, img/ |
 | `data/` | README + fixtures (raw/processed gitignored) |

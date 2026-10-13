@@ -12,9 +12,6 @@ import pandas as pd
 
 logger = logging.getLogger(__name__)
 
-# Order statuses that can never yield a delivered-late label.
-NON_DELIVERED_STATUSES = {"canceled", "unavailable"}
-
 
 def validate_orders(orders: pd.DataFrame) -> dict:
     """Run order-level quality checks. Returns a JSON-serializable report dict."""

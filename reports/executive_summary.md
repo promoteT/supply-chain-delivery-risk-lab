@@ -14,7 +14,7 @@ flagged at approval time, and how should a small daily review capacity be spent?
 ## 2. Findings (demo fixture — illustrative, NOT empirical)
 
 - Eligible delivered orders: 346 of 600 (canceled/unavailable/in-transit excluded).
-- Late rate ~54%; mean lead time ~14 days (≈5d approval→carrier + ≈10d carrier→delivery).
+- Late rate ~54%; mean lead time ~15.6 days (≈4.9d approval→carrier + ≈9.7d carrier→delivery).
 - Higher late rates in MG/SP states and short promised windows; delays
   concentrated across a subset of sellers (Pareto). These are **potential
   contributing factors**, not proven causes.

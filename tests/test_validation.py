@@ -33,4 +33,4 @@ def test_eligible_excludes_missing_not_on_time(tables):
 def test_missingness_sorted(tables):
     m = V.missingness_table(tables)
     assert "share_missing" in m.columns
-    assert (m["share_missing"].diff().fillna(0) <= 0).all() or True  # sorted desc
+    assert (m["share_missing"].diff().fillna(0) <= 1e-9).all(), "missingness not sorted desc"

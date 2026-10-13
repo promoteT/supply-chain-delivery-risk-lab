@@ -41,3 +41,45 @@ def test_recall_at_capacity_bounds(tables):
     m = M.recall_at_capacity(y, scores, 10)
     assert 0.0 <= m["recall_at_k"] <= 1.0
     assert 0.0 <= m["precision_at_k"] <= 1.0
+
+
+def test_assert_no_leakage_rejects_full_frame(tables):
+    import pandas as pd
+    import pytest
+
+    frame = _frame(tables).copy()
+    frame["order_delivered_customer_date"] = pd.Timestamp("2017-01-01")
+    with pytest.raises(ValueError):
+        M.assert_no_leakage(frame)
+
+
+def test_business_rule_uses_train_stats(tables):
+    frame = _frame(tables)
+    splits = M.chronological_split(frame)
+    train_stats = M._fit_rule_params(splits["train"])
+    s_train_fit = M.business_rule_scores(splits["test"], train_stats=train_stats)
+    assert ((s_train_fit >= 0) & (s_train_fit <= 1)).all()
+    # train-fitted params come from train, not test
+    assert train_stats["median"] == splits["train"]["promised_days_at_approval"].median()
+
+
+def test_evaluate_model_single_class_safe():
+    import pandas as pd
+
+    base = pd.Timestamp("2017-01-01")
+    n = 30
+    df = pd.DataFrame(
+        {
+            "order_id": [f"x{i}" for i in range(n)],
+            "order_approved_at": [base + pd.Timedelta(days=i) for i in range(n)],
+            "target_late": [0] * n,
+            **{c: 0.0 for c in M.NUMERIC_FEATURES},
+            **{c: "unknown" for c in M.CATEGORICAL_FEATURES},
+        }
+    )
+    splits = M.chronological_split(df)
+    models = M.build_models()
+    res = M.evaluate_model("logistic", models["logistic"], splits, capacities=(5,))
+    import math
+
+    assert math.isnan(res["roc_auc"]) or 0.0 <= res["roc_auc"] <= 1.0

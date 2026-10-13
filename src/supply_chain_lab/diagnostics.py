@@ -76,7 +76,12 @@ def pareto_sellers(
 
 
 def run_sql_file(sql_path: Path, tables: dict[str, pd.DataFrame]) -> list[pd.DataFrame]:
-    """Execute a multi-statement .sql file against in-memory DuckDB tables."""
+    """Execute a multi-statement .sql file against in-memory DuckDB tables.
+
+    Constraint: SQL files must not contain ';' inside string literals or
+    trailing inline comments — statements are split on ';' after stripping
+    full-line '--' comments.
+    """
     con = duckdb.connect()
     for name, df in tables.items():
         con.register(name, df)

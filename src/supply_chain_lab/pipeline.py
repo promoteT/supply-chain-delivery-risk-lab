@@ -121,7 +121,12 @@ def build_deck(
     return out_path
 
 
-def run(mode: str = "auto", out_dir: Path = OUTPUTS_DIR) -> dict:
+def run(
+    mode: str = "auto",
+    out_dir: Path = OUTPUTS_DIR,
+    processed_dir: Path = PROCESSED_DIR,
+    deck_path: Path | None = None,
+) -> dict:
     if mode == "demo":
         ensure_fixtures()
         tables, actual = I.load_tables(FIXTURES_DIR)
@@ -166,8 +171,8 @@ def run(mode: str = "auto", out_dir: Path = OUTPUTS_DIR) -> dict:
     order_level = F.build_order_level(
         orders, items_agg, tables.get("customers"), tables.get("sellers")
     )
-    PROCESSED_DIR.mkdir(parents=True, exist_ok=True)
-    order_level.to_csv(PROCESSED_DIR / f"order_level_{actual}.csv", index=False)
+    processed_dir.mkdir(parents=True, exist_ok=True)
+    order_level.to_csv(processed_dir / f"order_level_{actual}.csv", index=False)
 
     period = (
         f"{pd.to_datetime(orders['order_purchase_timestamp']).min().date()} to "
@@ -210,7 +215,9 @@ def run(mode: str = "auto", out_dir: Path = OUTPUTS_DIR) -> dict:
     ]
     baselines = M.evaluate_rule_and_baseline(splits)
     test_scores = models["hgb"].predict_proba(splits["test"][M.FEATURE_COLS])[:, 1]
-    rule_scores = M.business_rule_scores(splits["test"])
+    rule_scores = M.business_rule_scores(
+        splits["test"], train_stats=M._fit_rule_params(splits["train"])
+    )
     comparison = S.compare_policies(splits["test"], test_scores, rule_scores)
     assumptions = ScenarioAssumptions()
     scenario_costed = S.hypothetical_costs(comparison, assumptions.cost_per_review)
@@ -281,8 +288,9 @@ def run(mode: str = "auto", out_dir: Path = OUTPUTS_DIR) -> dict:
         data_dict,
         delay_table,
     )
+    deck_path = deck_path or (REPORTS_DIR / f"consulting_deck_{actual}.pptx")
     deck_path = build_deck(
-        REPORTS_DIR / f"consulting_deck_{actual}.pptx",
+        deck_path,
         actual,
         kpis,
         model_results,

@@ -39,4 +39,13 @@
 ## Blockers / pending
 - Real Olist CSVs unavailable in this environment (need Kaggle download) →
   empirical findings marked PENDING; demo outputs labeled synthetic.
-- No remote configured yet → publish step pending (M7).
+- Remote `origin https://github.com/promoteT/supply-chain-delivery-risk-lab.git`
+  configured 2026-10-13; review fixes applied (freight_share NaN, hermetic
+  pipeline, leakage guard, Excel regression, train-fit rule, single-class guard).
+
+## 2026-10-13 — Review fixes + GitHub polish
+- TDD RED→GREEN: itemless-order NaNs, leakage full-frame guard, hermetic
+  pipeline (`processed_dir`/`deck_path`), Excel values/chart/inputs regression,
+  train-fit business rule, single-class NaN guard. 27 tests pass, ruff clean.
+- Docs: corrected lead-time numbers to demo KPIs (15.6 / 4.87 / 9.72);
+  `.gitignore` += `.ruff_cache/`; README visual polish (badges, tables, charts).

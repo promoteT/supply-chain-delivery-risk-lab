@@ -32,10 +32,9 @@ TIME_COL = "order_approved_at"
 
 
 def assert_no_leakage(df: pd.DataFrame) -> None:
-    leak = LEAKAGE_COLUMNS.intersection(set(df.columns)) - {"target_late"}
-    present = [c for c in FEATURE_COLS if c in leak]
-    if present:
-        raise ValueError(f"Leakage features detected: {present}")
+    leak = LEAKAGE_COLUMNS.intersection(set(df.columns))
+    if leak:
+        raise ValueError(f"Leakage columns present: {sorted(leak)}")
     for forbidden in (
         "order_delivered_customer_date",
         "order_delivered_carrier_date",
@@ -90,14 +89,25 @@ def majority_baseline_rate(y_train: pd.Series) -> float:
     return float(y_train.mean())
 
 
-def business_rule_scores(df: pd.DataFrame) -> np.ndarray:
+def _fit_rule_params(train_df: pd.DataFrame) -> dict:
+    s = train_df["promised_days_at_approval"]
+    return {"median": float(s.median()), "min": float(s.min()), "max": float(s.max())}
+
+
+def business_rule_scores(df: pd.DataFrame, train_stats: dict | None = None) -> np.ndarray:
     """Simple rule: risk rises with short promised window + multi-seller + high freight share.
 
     Uses ONLY approval-time features. Returns scores in [0,1] (not calibrated).
+    If train_stats given (fit on train), apply to df to avoid test leakage.
     """
-    promised = df["promised_days_at_approval"].fillna(df["promised_days_at_approval"].median())
+    stats = train_stats or {
+        "median": float(df["promised_days_at_approval"].median()),
+        "min": float(df["promised_days_at_approval"].min()),
+        "max": float(df["promised_days_at_approval"].max()),
+    }
+    promised = df["promised_days_at_approval"].fillna(stats["median"])
     # shorter promised window -> historically riskier
-    short = 1.0 - (promised - promised.min()) / (promised.max() - promised.min() + 1e-9)
+    short = 1.0 - (promised - stats["min"]) / (stats["max"] - stats["min"] + 1e-9)
     score = (
         0.5 * short.fillna(0.5)
         + 0.3 * df["is_multi_seller"].fillna(0)
@@ -149,6 +159,21 @@ def evaluate_model(
     X_train, y_train = splits["train"][FEATURE_COLS], splits["train"]["target_late"]
     X_valid, y_valid = splits["valid"][FEATURE_COLS], splits["valid"]["target_late"]
     X_test, y_test = splits["test"][FEATURE_COLS], splits["test"]["target_late"]
+    if pd.Series(y_train).nunique() < 2:
+        logger.warning("Single-class train set — returning NaN metrics")
+        return {
+            "model": name,
+            "n_train": len(X_train),
+            "n_valid": len(X_valid),
+            "n_test": len(X_test),
+            "base_rate_test": round(float(np.asarray(y_test).mean()), 4) if len(y_test) else 0.0,
+            "roc_auc": float("nan"),
+            "pr_auc": float("nan"),
+            **_metrics_at_threshold(y_test, np.full(len(y_test), 0.5), 0.5),
+            "capacity_metrics": [
+                recall_at_capacity(y_test, np.full(len(y_test), 0.5), c) for c in capacities
+            ],
+        }
     model.fit(X_train, y_train)
     s_valid = model.predict_proba(X_valid)[:, 1]
     s_test = model.predict_proba(X_test)[:, 1]
@@ -163,14 +188,20 @@ def evaluate_model(
             best_j, best = j, t
 
     test_m = _metrics_at_threshold(y_test, s_test, best)
+    if pd.Series(y_test).nunique() < 2:
+        logger.warning("Single-class test set — roc/pr_auc set to NaN")
+        roc_auc, pr_auc = float("nan"), float("nan")
+    else:
+        roc_auc = round(float(roc_auc_score(y_test, s_test)), 4)
+        pr_auc = round(float(average_precision_score(y_test, s_test)), 4)
     result = {
         "model": name,
         "n_train": len(X_train),
         "n_valid": len(X_valid),
         "n_test": len(X_test),
         "base_rate_test": round(float(np.asarray(y_test).mean()), 4),
-        "roc_auc": round(float(roc_auc_score(y_test, s_test)), 4),
-        "pr_auc": round(float(average_precision_score(y_test, s_test)), 4),
+        "roc_auc": roc_auc,
+        "pr_auc": pr_auc,
         **test_m,
         "capacity_metrics": [recall_at_capacity(y_test, s_test, c) for c in capacities],
     }
@@ -205,12 +236,19 @@ def evaluate_rule_and_baseline(splits: dict[str, pd.DataFrame]) -> list[dict]:
             "tp": int(tp),
         }
     ]
-    rule_scores = business_rule_scores(splits["test"])
+    rule_scores = business_rule_scores(
+        splits["test"], train_stats=_fit_rule_params(splits["train"])
+    )
+    if pd.Series(y_test).nunique() < 2:
+        rule_roc, rule_pr = float("nan"), float("nan")
+    else:
+        rule_roc = round(float(roc_auc_score(y_test, rule_scores)), 4)
+        rule_pr = round(float(average_precision_score(y_test, rule_scores)), 4)
     out.append(
         {
             "model": "business_rule",
-            "roc_auc": round(float(roc_auc_score(y_test, rule_scores)), 4),
-            "pr_auc": round(float(average_precision_score(y_test, rule_scores)), 4),
+            "roc_auc": rule_roc,
+            "pr_auc": rule_pr,
             "capacity_metrics": [recall_at_capacity(y_test, rule_scores, c) for c in (20, 50, 100)],
         }
     )
