@@ -322,7 +322,7 @@ def run(
     pareto.to_csv(out_dir / "pareto_sellers.csv", index=False)
     miss.to_csv(out_dir / "missingness.csv", index=False)
 
-    logger.info("Pipeline complete (mode=%s). Artifacts in %s and %s", actual, out_dir, REPORTS_DIR)
+    logger.info("Pipeline complete (mode=%s). Artifacts in %s and %s", actual, out_dir, deck_path)
     return {
         "mode": actual,
         "kpis": kpis,
@@ -336,8 +336,15 @@ def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--mode", choices=["auto", "demo", "real"], default="auto")
     ap.add_argument("--out", default=str(OUTPUTS_DIR))
+    ap.add_argument("--processed-dir", default=str(PROCESSED_DIR))
+    ap.add_argument("--deck", default=None)
     args = ap.parse_args()
-    run(mode=args.mode, out_dir=Path(args.out))
+    run(
+        mode=args.mode,
+        out_dir=Path(args.out),
+        processed_dir=Path(args.processed_dir),
+        deck_path=Path(args.deck) if args.deck else None,
+    )
 
 
 if __name__ == "__main__":
